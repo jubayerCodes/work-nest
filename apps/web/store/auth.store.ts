@@ -29,6 +29,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           const res = await api.post('/auth/login', { email, password });
           set({ user: res.data.data.user, isAuthenticated: true });
+          // Set a web-domain cookie so Next.js middleware can detect auth across domains
+          if (typeof document !== 'undefined') {
+            document.cookie = 'wn_auth=1; path=/; max-age=86400; samesite=lax';
+          }
         } finally {
           set({ isLoading: false });
         }
@@ -39,6 +43,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           const res = await api.post('/auth/register', { name, email, password });
           set({ user: res.data.data.user, isAuthenticated: true });
+          // Set a web-domain cookie so Next.js middleware can detect auth across domains
+          if (typeof document !== 'undefined') {
+            document.cookie = 'wn_auth=1; path=/; max-age=86400; samesite=lax';
+          }
         } finally {
           set({ isLoading: false });
         }
@@ -47,6 +55,10 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         await api.post('/auth/logout').catch(() => {});
         set({ user: null, isAuthenticated: false });
+        // Clear the web-domain indicator cookie
+        if (typeof document !== 'undefined') {
+          document.cookie = 'wn_auth=; path=/; max-age=0';
+        }
       },
 
       fetchMe: async () => {
