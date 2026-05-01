@@ -42,23 +42,30 @@ export function setCookies(
 ): void {
   const isProduction = env.NODE_ENV === 'production';
 
+  // SameSite=None is required for cross-domain deployments (e.g. Render web + API on different subdomains).
+  // SameSite=None requires Secure=true, which is enforced in production.
+  const sameSite = isProduction ? 'none' : 'lax';
+
   res.cookie('access_token', accessToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000, // 1 day — matches JWT_ACCESS_EXPIRES_IN
+    sameSite,
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
   });
 
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days — matches JWT_REFRESH_EXPIRES_IN
-    path: '/', // Send on all requests so interceptor can reach /api/auth/refresh
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
   });
 }
 
 export function clearCookies(res: import('express').Response): void {
-  res.clearCookie('access_token');
-  res.clearCookie('refresh_token', { path: '/' }); // Must match the path set in setCookies
+  const isProduction = env.NODE_ENV === 'production';
+  const sameSite = isProduction ? 'none' : 'lax';
+  // Must clear with same options as set, otherwise browser ignores the clear
+  res.clearCookie('access_token', { secure: isProduction, sameSite });
+  res.clearCookie('refresh_token', { path: '/', secure: isProduction, sameSite });
 }

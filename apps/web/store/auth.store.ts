@@ -65,11 +65,18 @@ export const useAuthStore = create<AuthState>()(
         try {
           const res = await api.get('/auth/me');
           set({ user: res.data.data.user, isAuthenticated: true });
+          // Refresh the web-domain indicator cookie on every successful auth check
+          if (typeof document !== 'undefined') {
+            document.cookie = 'wn_auth=1; path=/; max-age=86400; samesite=lax';
+          }
         } catch (err: unknown) {
           // Only clear auth on explicit 401 — ignore network errors / server restarts
           const status = (err as { response?: { status?: number } })?.response?.status;
           if (status === 401) {
             set({ user: null, isAuthenticated: false });
+            if (typeof document !== 'undefined') {
+              document.cookie = 'wn_auth=; path=/; max-age=0';
+            }
           }
         }
       },
