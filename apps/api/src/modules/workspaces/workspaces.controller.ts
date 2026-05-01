@@ -15,6 +15,8 @@ import {
 import { createWorkspaceSchema, updateWorkspaceSchema, inviteMemberSchema, updateMemberRoleSchema } from '@worknest/validators';
 import { env } from '../../config/env';
 
+const p = (req: AuthRequest, key: string): string => req.params[key] as string;
+
 export async function getMyWorkspaces(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const memberships = await getUserWorkspaces(req.user!.id);
@@ -32,7 +34,7 @@ export async function create(req: AuthRequest, res: Response, next: NextFunction
 
 export async function getOne(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const workspace = await getWorkspaceById(req.params.workspaceId, req.user!.id);
+    const workspace = await getWorkspaceById(p(req, 'workspaceId'), req.user!.id);
     res.json({ success: true, data: workspace });
   } catch (e) { next(e); }
 }
@@ -40,14 +42,14 @@ export async function getOne(req: AuthRequest, res: Response, next: NextFunction
 export async function update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = updateWorkspaceSchema.parse(req.body);
-    const workspace = await updateWorkspace(req.params.workspaceId, data);
+    const workspace = await updateWorkspace(p(req, 'workspaceId'), data);
     res.json({ success: true, message: 'Workspace updated', data: workspace });
   } catch (e) { next(e); }
 }
 
 export async function remove(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteWorkspace(req.params.workspaceId);
+    await deleteWorkspace(p(req, 'workspaceId'));
     res.json({ success: true, message: 'Workspace deleted' });
   } catch (e) { next(e); }
 }
@@ -55,8 +57,8 @@ export async function remove(req: AuthRequest, res: Response, next: NextFunction
 export async function invite(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = inviteMemberSchema.parse(req.body);
-    const result = await inviteMember(req.params.workspaceId, data, env.CLIENT_URL);
-    res.json({ success: true, message: result.message });
+    const result = await inviteMember(p(req, 'workspaceId'), data, env.CLIENT_URL);
+    res.json({ success: true, message: result.message, data: { inviteLink: result.inviteLink } });
   } catch (e) { next(e); }
 }
 
@@ -70,14 +72,14 @@ export async function acceptInvite(req: AuthRequest, res: Response, next: NextFu
 
 export async function getInvitation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const invitation = await getInvitationByToken(req.params.token);
+    const invitation = await getInvitationByToken(p(req, 'token'));
     res.json({ success: true, data: invitation });
   } catch (e) { next(e); }
 }
 
 export async function kickMember(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await removeMember(req.params.workspaceId, req.params.userId, req.user!.id);
+    await removeMember(p(req, 'workspaceId'), p(req, 'userId'), req.user!.id);
     res.json({ success: true, message: 'Member removed' });
   } catch (e) { next(e); }
 }
@@ -85,7 +87,7 @@ export async function kickMember(req: AuthRequest, res: Response, next: NextFunc
 export async function changeRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { role } = updateMemberRoleSchema.parse(req.body);
-    const member = await updateMemberRole(req.params.workspaceId, req.params.userId, role);
+    const member = await updateMemberRole(p(req, 'workspaceId'), p(req, 'userId'), role);
     res.json({ success: true, data: member });
   } catch (e) { next(e); }
 }

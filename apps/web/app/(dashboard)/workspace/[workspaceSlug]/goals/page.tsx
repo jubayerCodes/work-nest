@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useWorkspaceStore } from "@/store/workspace.store";
 import { api } from "@/lib/api";
 import type { IGoal } from "@worknest/types";
@@ -19,7 +19,6 @@ const STATUS_LABELS: Record<GoalStatus, string> = {
 
 export default function GoalsPage() {
   const params = useParams();
-  const router = useRouter();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [loading, setLoading] = useState(true);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ctrl from './announcements.controller';
 import { authMiddleware, workspaceGuard, adminGuard } from '../../middleware/auth.middleware';
 
-const router = Router({ mergeParams: true });
+const router: Router = Router({ mergeParams: true });
 router.use(authMiddleware, workspaceGuard);
 
 router.get('/', ctrl.getAll);

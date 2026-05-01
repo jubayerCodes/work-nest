@@ -7,7 +7,7 @@ import type { AuthRequest } from '../../middleware/auth.middleware';
 import { Response, NextFunction } from 'express';
 import { AppError } from '../../middleware/error.middleware';
 
-const router = Router();
+const router: Router = Router();
 router.use(authMiddleware);
 
 // GET /api/users/me — full profile with workspace memberships

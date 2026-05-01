@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [desc, setDesc] = useState('');
   const [color, setColor] = useState('#6366f1');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
   const [saving, setSaving] = useState(false);
   const [inviting, setInviting] = useState(false);
 
@@ -47,9 +48,11 @@ export default function SettingsPage() {
   const sendInvite = async () => {
     if (!inviteEmail.trim() || !workspaceId) return;
     setInviting(true);
+    setInviteLink('');
     try {
-      await api.post(`/workspaces/${workspaceId}/members/invite`, { email: inviteEmail });
+      const res = await api.post(`/workspaces/${workspaceId}/members/invite`, { email: inviteEmail });
       toast.success(`Invitation sent to ${inviteEmail}`);
+      setInviteLink(res.data.data?.inviteLink ?? '');
       setInviteEmail('');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to send invite';
@@ -113,12 +116,23 @@ export default function SettingsPage() {
         <h3 style={{ marginBottom: '1.25rem', fontSize: '1rem' }}>Members</h3>
 
         {isAdmin && (
-          <div style={{ display: 'flex', gap: '0.625rem', marginBottom: '1.25rem' }}>
-            <input id="invite-email" type="email" className="form-input" placeholder="Invite by email…" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendInvite()} style={{ flex: 1 }} />
-            <button className="btn btn-primary btn-sm" onClick={sendInvite} disabled={inviting || !inviteEmail.trim()}>
-              {inviting ? 'Sending…' : 'Send invite'}
-            </button>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.625rem', marginBottom: '0.625rem' }}>
+              <input id="invite-email" type="email" className="form-input" placeholder="Invite by email…" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendInvite()} style={{ flex: 1 }} />
+              <button className="btn btn-primary btn-sm" onClick={sendInvite} disabled={inviting || !inviteEmail.trim()}>
+                {inviting ? 'Sending…' : 'Send invite'}
+              </button>
+            </div>
+            {inviteLink && (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.625rem 0.875rem', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', flexShrink: 0 }}>🔗 Share link:</span>
+                <input readOnly value={inviteLink} className="form-input" style={{ flex: 1, fontSize: '0.75rem', padding: '0.25rem 0.5rem' }} onClick={(e) => (e.target as HTMLInputElement).select()} />
+                <button className="btn btn-ghost btn-sm" onClick={() => { navigator.clipboard.writeText(inviteLink); toast.success('Link copied!'); }}>
+                  Copy
+                </button>
+              </div>
+            )}
           </div>
         )}
 

@@ -3,8 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "../../",
+    "skipLibCheck": true
   },
-  "include": ["src"],
+  "include": ["src", "../../packages/*/src"],
   "exclude": ["node_modules", "dist", "prisma/seed.ts"]
 }

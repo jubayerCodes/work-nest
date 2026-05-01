@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../middleware/error.middleware';
-import { emitToWorkspace } from '../../realtime/socket';
+import { emitToWorkspace, getIO } from '../../realtime/socket';
 import type { CreateAnnouncementInput, UpdateAnnouncementInput, CreateCommentInput, ToggleReactionInput } from '@worknest/validators';
 
 const ANNOUNCEMENT_SELECT = {
@@ -112,16 +112,76 @@ export async function createComment(announcementId: string, authorId: string, wo
     },
   });
 
-  // Notify announcement author on new top-level comment
+  // --- Notifications ---
+  const notificationsToCreate: { userId: string; type: string; payload: object }[] = [];
+
+  // 1. Notify announcement author on new top-level comment (if not self)
   if (!data.parentId && ann.authorId !== authorId) {
-    await prisma.notification.create({
-      data: { userId: ann.authorId, type: 'COMMENT', payload: { announcementId, commentId: comment.id, preview: data.content.slice(0, 100) } },
+    notificationsToCreate.push({
+      userId: ann.authorId,
+      type: 'COMMENT',
+      payload: { announcementId, commentId: comment.id, message: `💬 New comment on "${ann.title}"`, preview: data.content.slice(0, 100) },
     });
+  }
+
+  // 2. Parse @mentions — extract all @Name patterns from the comment
+  const mentionPattern = /@([\w\s]{2,30}?)(?=\s|$|[^a-zA-Z0-9_\s])/g;
+  const mentionedNames = [...new Set([...data.content.matchAll(mentionPattern)].map((m) => m[1].trim().toLowerCase()))];
+
+  if (mentionedNames.length > 0) {
+    // Find workspace members whose names match a mention
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    const authorUser = members.find((m) => m.userId === authorId)?.user;
+    const mentionedUsers = members
+      .filter((m) => m.userId !== authorId && mentionedNames.some((n) => m.user.name.toLowerCase().includes(n)))
+      .map((m) => m.user);
+
+    if (mentionedUsers.length > 0) {
+      // Create Mention records + notifications in one transaction
+      const mentionData = mentionedUsers.map((u) => ({ userId: u.id, commentId: comment.id }));
+      await prisma.mention.createMany({ data: mentionData, skipDuplicates: true });
+
+      for (const mentioned of mentionedUsers) {
+        // Skip if already notified as comment author above
+        if (notificationsToCreate.some((n) => n.userId === mentioned.id)) continue;
+        notificationsToCreate.push({
+          userId: mentioned.id,
+          type: 'MENTION',
+          payload: {
+            announcementId,
+            commentId: comment.id,
+            message: `🔔 ${authorUser?.name ?? 'Someone'} mentioned you in "${ann.title}"`,
+            preview: data.content.slice(0, 100),
+          },
+        });
+      }
+    }
+  }
+
+  // Bulk-create all notifications and emit to each recipient
+  if (notificationsToCreate.length > 0) {
+    const created = await prisma.$transaction(
+      notificationsToCreate.map((n) =>
+        prisma.notification.create({ data: { userId: n.userId, type: n.type, payload: n.payload } })
+      )
+    );
+    // Emit notification:new to each user's personal room
+    try {
+      const ioInstance = getIO();
+      created.forEach((notif) => {
+        ioInstance.to(`user:${notif.userId}`).emit('notification:new', notif as unknown as import('@worknest/types').INotification);
+      });
+    } catch { /* socket may not be ready in test/seed context */ }
   }
 
   emitToWorkspace(workspaceId, 'comment:new', comment as never);
   return comment;
 }
+
 
 export async function updateComment(commentId: string, authorId: string, workspaceId: string, content: string) {
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });

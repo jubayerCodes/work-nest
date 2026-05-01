@@ -122,9 +122,16 @@ export async function inviteMember(
   });
 
   const inviteLink = `${clientUrl}/invite?token=${token}`;
-  await sendInvitationEmail(data.email, workspace.name, inviteLink);
 
-  return { message: 'Invitation sent' };
+  // Non-fatal: email failure should not block the invitation creation
+  try {
+    await sendInvitationEmail(data.email, workspace.name, inviteLink);
+  } catch (emailErr) {
+    console.error('[Email] Failed to send invitation email:', emailErr);
+    // Invitation is still stored — user can share the link manually
+  }
+
+  return { message: 'Invitation sent', inviteLink };
 }
 
 export async function acceptInvitation(token: string, userId: string) {

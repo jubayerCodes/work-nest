@@ -129,18 +129,19 @@ export default function ActionItemsPage() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  // Live updates
+  // Live updates — socket is single source of truth
   useEffect(() => {
-    socket.on('action:moved', ({ id, status }: { id: string; status: ActionStatus }) => {
+    const onMoved = ({ id, status }: { id: string; status: ActionStatus }) =>
       setItems((prev) => prev.map((i) => i.id === id ? { ...i, status } : i));
-    });
-    socket.on('action:updated', (updated: IActionItem) => {
+    const onUpdated = (updated: IActionItem) =>
       setItems((prev) => {
-        const exists = prev.find((i) => i.id === updated.id);
+        const exists = prev.some((i) => i.id === updated.id);
+        // Dedup new items too — prevents double-add with optimistic onCreated
         return exists ? prev.map((i) => i.id === updated.id ? updated : i) : [updated, ...prev];
       });
-    });
-    return () => { socket.off('action:moved'); socket.off('action:updated'); };
+    socket.on('action:moved', onMoved);
+    socket.on('action:updated', onUpdated);
+    return () => { socket.off('action:moved', onMoved); socket.off('action:updated', onUpdated); };
   }, [socket]);
 
   const onDragStart = (e: DragStartEvent) => {
@@ -247,14 +248,17 @@ export default function ActionItemsPage() {
         <CreateItemModal
           workspaceId={workspaceId}
           onClose={() => setShowCreate(false)}
-          onCreated={(item) => { setItems((p) => [item, ...p]); setShowCreate(false); }}
+          onCreated={() => {
+            // Socket 'action:updated' is the single source of truth — no optimistic add
+            setShowCreate(false);
+          }}
         />
       )}
     </div>
   );
 }
 
-function CreateItemModal({ workspaceId, onClose, onCreated }: { workspaceId: string; onClose: () => void; onCreated: (item: IActionItem) => void }) {
+function CreateItemModal({ workspaceId, onClose, onCreated }: { workspaceId: string; onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
   const [dueDate, setDueDate] = useState('');
@@ -266,8 +270,9 @@ function CreateItemModal({ workspaceId, onClose, onCreated }: { workspaceId: str
     setLoading(true);
     try {
       const res = await api.post(`/workspaces/${workspaceId}/action-items`, { title, priority, dueDate: dueDate || null });
+      void res; // socket event handles list update
       toast.success('Action item created!');
-      onCreated(res.data.data);
+      onCreated();
     } catch { toast.error('Failed to create item'); }
     finally { setLoading(false); }
   };

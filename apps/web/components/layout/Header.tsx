@@ -9,7 +9,9 @@ const PAGE_TITLES: Record<string, string> = {
   'goals': 'Goals',
   'action-items': 'Action Items',
   'announcements': 'Announcements',
+  'notifications': 'Notifications',
   'settings': 'Settings',
+  'profile': 'My Profile',
 };
 
 export default function Header() {

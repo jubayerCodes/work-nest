@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ctrl from './goals.controller';
 import { authMiddleware, workspaceGuard } from '../../middleware/auth.middleware';
 
-const router = Router({ mergeParams: true }); // inherits workspaceId from parent
+const router: Router = Router({ mergeParams: true }); // inherits workspaceId from parent
 router.use(authMiddleware, workspaceGuard);
 
 router.get('/', ctrl.getGoals);

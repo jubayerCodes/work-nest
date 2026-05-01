@@ -4,7 +4,7 @@ import { prisma } from '../../config/prisma';
 import type { AuthRequest } from '../../middleware/auth.middleware';
 import { Response, NextFunction } from 'express';
 
-const router = Router();
+const router: Router = Router();
 router.use(authMiddleware);
 
 // GET /api/notifications?workspaceId=...
@@ -28,7 +28,7 @@ router.patch('/read-all', async (req: AuthRequest, res: Response, next: NextFunc
 
 router.patch('/:id/read', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    await prisma.notification.updateMany({ where: { id: req.params.id, userId: req.user!.id }, data: { read: true } });
+    await prisma.notification.updateMany({ where: { id: req.params.id as string, userId: req.user!.id }, data: { read: true } });
     res.json({ success: true });
   } catch (e) { next(e); }
 });

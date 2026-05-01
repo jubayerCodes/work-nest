@@ -1,7 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { IWorkspace, IWorkspaceMember } from '@worknest/types';
+import type { IWorkspace, IWorkspaceMember, Role } from '@worknest/types';
 import { api } from '@/lib/api';
 
 interface WorkspaceState {
@@ -29,13 +29,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({ isLoading: true });
         try {
           const res = await api.get('/workspaces');
-          const memberships = res.data.data as { workspace: IWorkspace; role: string }[];
+          const memberships = res.data.data as { workspace: IWorkspace; role: Role }[];
           const workspaces = memberships.map((m) => ({ ...m.workspace, role: m.role }));
-          set({ workspaces });
-          // Set first workspace as active if none selected
-          if (!get().activeWorkspace && workspaces.length > 0) {
-            set({ activeWorkspace: workspaces[0] });
-          }
+          set((s) => {
+            // Refresh activeWorkspace data if it's in the new list
+            const active = s.activeWorkspace
+              ? workspaces.find((w) => w.id === s.activeWorkspace!.id) ?? s.activeWorkspace
+              : workspaces[0] ?? null;
+            return { workspaces, activeWorkspace: active };
+          });
         } finally {
           set({ isLoading: false });
         }
@@ -44,7 +46,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       fetchWorkspace: async (workspaceId) => {
         const res = await api.get(`/workspaces/${workspaceId}`);
         const data = res.data.data;
-        set({ activeWorkspace: data, members: data.members ?? [] });
+        set((s) => ({
+          activeWorkspace: s.activeWorkspace?.id === workspaceId
+            ? { ...s.activeWorkspace, ...data }
+            : s.activeWorkspace,
+          members: data.members ?? [],
+          workspaces: s.workspaces.map((w) => w.id === workspaceId ? { ...w, ...data } : w),
+        }));
       },
 
       createWorkspace: async (data) => {

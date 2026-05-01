@@ -19,7 +19,8 @@ export function emitToWorkspace<K extends keyof ServerToClientEvents>(
   event: K,
   data: Parameters<ServerToClientEvents[K]>[0]
 ): void {
-  io.to(`workspace:${workspaceId}`).emit(event as string, data);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (io as any).to(`workspace:${workspaceId}`).emit(event, data);
 }
 
 export function initSocket(server: HttpServer): void {
@@ -61,6 +62,9 @@ export function initSocket(server: HttpServer): void {
     const userId = (socket as typeof socket & { userId: string }).userId;
     console.log(`[Socket] Connected: ${userId} (${socket.id})`);
 
+    // Join personal room for targeted notifications (mentions, DMs, etc.)
+    socket.join(`user:${userId}`);
+
     // Join a workspace room
     socket.on('workspace:join', (workspaceId: string) => {
       const room = `workspace:${workspaceId}`;
@@ -94,10 +98,10 @@ export function initSocket(server: HttpServer): void {
     // Handle disconnect
     socket.on('disconnect', () => {
       // Remove from all workspace presence maps
-      presence.forEach((userIds, workspaceId) => {
+      presence.forEach((userIds, wsId) => {
         if (userIds.has(userId)) {
           userIds.delete(userId);
-          const room = `workspace:${workspaceId}`;
+          const room = `workspace:${wsId}`;
           io.to(room).emit('presence:leave', { userId });
           io.to(room).emit('presence:online', { userIds: Array.from(userIds) });
         }

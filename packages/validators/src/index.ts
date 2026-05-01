@@ -27,8 +27,7 @@ export const createWorkspaceSchema = z.object({
   description: z.string().max(500).optional(),
   accentColor: z
     .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color')
-    .default('#6366f1'),
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color'),
 });
 
 export const updateWorkspaceSchema = createWorkspaceSchema.partial();

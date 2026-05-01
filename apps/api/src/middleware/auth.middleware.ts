@@ -53,7 +53,7 @@ export async function workspaceGuard(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { workspaceId } = req.params;
+    const workspaceId = req.params.workspaceId as string;
     const userId = req.user!.id;
 
     const member = await prisma.workspaceMember.findUnique({
@@ -79,7 +79,7 @@ export async function adminGuard(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { workspaceId } = req.params;
+    const workspaceId = req.params.workspaceId as string;
     const userId = req.user!.id;
 
     const member = await prisma.workspaceMember.findUnique({

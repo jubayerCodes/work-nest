@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/lib/api';
@@ -8,11 +7,11 @@ import type { IAnnouncement, IComment } from '@worknest/types';
 import { timeAgo } from '@worknest/utils';
 import toast from 'react-hot-toast';
 import { useSocket } from '@/hooks/useSocket';
+import MentionTextarea, { renderWithMentions, type MentionMember } from '@/components/MentionTextarea';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🎉', '🚀', '👀', '✅'];
 
 export default function AnnouncementsPage() {
-  const params = useParams();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const user = useAuthStore((s) => s.user);
   const [announcements, setAnnouncements] = useState<IAnnouncement[]>([]);
@@ -20,21 +19,28 @@ export default function AnnouncementsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, IComment[]>>({});
+  const [members, setMembers] = useState<MentionMember[]>([]);
 
   const workspaceId = activeWorkspace?.id;
   const isAdmin = user?.memberships?.some((m) => m.workspace.id === workspaceId && m.role === 'ADMIN');
   const socket = useSocket(workspaceId);
 
-  const fetch = useCallback(async () => {
+  const fetchAnnouncements = useCallback(async () => {
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/workspaces/${workspaceId}/announcements`);
-      setAnnouncements(res.data.data ?? []);
+      const [annRes, membersRes] = await Promise.all([
+        api.get(`/workspaces/${workspaceId}/announcements`),
+        api.get(`/workspaces/${workspaceId}`),
+      ]);
+      setAnnouncements(annRes.data.data ?? []);
+      // Extract members for @mention picker (exclude self)
+      const allMembers: { user: MentionMember }[] = membersRes.data.data?.members ?? [];
+      setMembers(allMembers.map((m) => m.user).filter((m) => m.id !== user?.id));
     } finally { setLoading(false); }
-  }, [workspaceId]);
+  }, [workspaceId, user?.id]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchAnnouncements(); }, [fetchAnnouncements]);
 
   // Real-time — socket is the single source of truth for list updates
   useEffect(() => {
@@ -130,12 +136,12 @@ export default function AnnouncementsPage() {
           {pinned.length > 0 && (
             <>
               <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📌 Pinned</div>
-              {pinned.map((ann) => <AnnouncementCard key={ann.id} ann={ann} isAdmin={!!isAdmin} userId={user?.id} workspaceId={workspaceId!} expanded={expanded === ann.id} comments={comments[ann.id] ?? []} onExpand={() => expandAnnouncement(ann.id)} onReact={toggleReaction} onPin={togglePin} onCommentsUpdate={(c) => setComments((p) => ({ ...p, [ann.id]: c }))} />)}
+              {pinned.map((ann) => <AnnouncementCard key={ann.id} ann={ann} isAdmin={!!isAdmin} userId={user?.id} workspaceId={workspaceId!} expanded={expanded === ann.id} comments={comments[ann.id] ?? []} members={members} onExpand={() => expandAnnouncement(ann.id)} onReact={toggleReaction} onPin={togglePin} onCommentsUpdate={(c) => setComments((p) => ({ ...p, [ann.id]: c }))} />)}
               <div className="divider" />
             </>
           )}
           {unpinned.map((ann) => (
-            <AnnouncementCard key={ann.id} ann={ann} isAdmin={!!isAdmin} userId={user?.id} workspaceId={workspaceId!} expanded={expanded === ann.id} comments={comments[ann.id] ?? []} onExpand={() => expandAnnouncement(ann.id)} onReact={toggleReaction} onPin={togglePin} onCommentsUpdate={(c) => setComments((p) => ({ ...p, [ann.id]: c }))} />
+            <AnnouncementCard key={ann.id} ann={ann} isAdmin={!!isAdmin} userId={user?.id} workspaceId={workspaceId!} expanded={expanded === ann.id} comments={comments[ann.id] ?? []} members={members} onExpand={() => expandAnnouncement(ann.id)} onReact={toggleReaction} onPin={togglePin} onCommentsUpdate={(c) => setComments((p) => ({ ...p, [ann.id]: c }))} />
           ))}
         </div>
       )}
@@ -155,8 +161,8 @@ export default function AnnouncementsPage() {
   );
 }
 
-function AnnouncementCard({ ann, isAdmin, userId, workspaceId, expanded, comments, onExpand, onReact, onPin, onCommentsUpdate }:
-  { ann: IAnnouncement; isAdmin: boolean; userId?: string; workspaceId: string; expanded: boolean; comments: IComment[]; onExpand: () => void; onReact: (id: string, emoji: string) => void; onPin: (ann: IAnnouncement) => void; onCommentsUpdate: (c: IComment[]) => void }) {
+function AnnouncementCard({ ann, isAdmin, userId, workspaceId, expanded, comments, members, onExpand, onReact, onPin, onCommentsUpdate }:
+  { ann: IAnnouncement; isAdmin: boolean; userId?: string; workspaceId: string; expanded: boolean; comments: IComment[]; members: MentionMember[]; onExpand: () => void; onReact: (id: string, emoji: string) => void; onPin: (ann: IAnnouncement) => void; onCommentsUpdate: (c: IComment[]) => void }) {
 
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -171,8 +177,8 @@ function AnnouncementCard({ ann, isAdmin, userId, workspaceId, expanded, comment
     if (!commentText.trim()) return;
     setSubmitting(true);
     try {
-      const res = await api.post(`/workspaces/${workspaceId}/announcements/${ann.id}/comments`, { content: commentText });
-      onCommentsUpdate([...comments, res.data.data]);
+      // Socket 'comment:new' is the source of truth — no optimistic add
+      await api.post(`/workspaces/${workspaceId}/announcements/${ann.id}/comments`, { content: commentText });
       setCommentText('');
     } catch { toast.error('Failed to post comment'); }
     finally { setSubmitting(false); }
@@ -232,13 +238,17 @@ function AnnouncementCard({ ann, isAdmin, userId, workspaceId, expanded, comment
                   <strong style={{ color: 'var(--text)' }}>{c.author.name}</strong>{' '}
                   <span style={{ color: 'var(--text-subtle)' }}>{timeAgo(c.createdAt)}</span>
                 </div>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>{c.content}</p>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  {renderWithMentions(c.content)}
+                </p>
                 {c.replies && c.replies.length > 0 && (
                   <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '2px solid var(--border)' }}>
                     {c.replies.map((r) => (
                       <div key={r.id} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                         <div className="avatar avatar-sm">{r.author.avatarUrl ? <img src={r.author.avatarUrl} alt="" /> : r.author.name[0]}</div>
-                        <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}><strong style={{ color: 'var(--text)' }}>{r.author.name}</strong>: {r.content}</p>
+                        <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                          <strong style={{ color: 'var(--text)' }}>{r.author.name}</strong>: {renderWithMentions(r.content)}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -246,9 +256,15 @@ function AnnouncementCard({ ann, isAdmin, userId, workspaceId, expanded, comment
               </div>
             </div>
           ))}
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <input className="form-input" placeholder="Write a comment…" value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitComment()} style={{ flex: 1 }} />
-            <button className="btn btn-primary btn-sm" onClick={submitComment} disabled={submitting || !commentText.trim()}>Post</button>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'flex-end' }}>
+            <MentionTextarea
+              value={commentText}
+              onChange={setCommentText}
+              onSubmit={submitComment}
+              members={members}
+              placeholder="Write a comment… type @ to mention a teammate"
+            />
+            <button className="btn btn-primary btn-sm" onClick={submitComment} disabled={submitting || !commentText.trim()} style={{ flexShrink: 0 }}>Post</button>
           </div>
         </div>
       )}

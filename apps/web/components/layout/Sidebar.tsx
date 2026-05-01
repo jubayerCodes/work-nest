@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
+import { useNotificationStore } from '@/store/notification.store';
+import { usePresenceStore } from '@/store/presence.store';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { getInitials } from '@worknest/utils';
 
@@ -44,6 +46,15 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: 'Notifications',
+    href: '/notifications',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar() {
@@ -51,6 +62,8 @@ export default function Sidebar() {
   const router = useRouter();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const { user, logout } = useAuthStore();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const isOnline = usePresenceStore((s) => s.isOnline);
 
   const base = activeWorkspace ? `/workspace/${activeWorkspace.slug}` : '#';
 
@@ -82,9 +95,17 @@ export default function Sidebar() {
           const isActive = item.href === ''
             ? pathname === base || pathname === `${base}/`
             : pathname.startsWith(href);
+          const badge = item.label === 'Notifications' && unreadCount > 0 ? unreadCount : null;
           return (
             <Link key={item.label} href={href} className={`nav-item ${isActive ? 'active' : ''}`}>
-              <span className="icon">{item.icon}</span>
+              <span className="icon" style={{ position: 'relative' }}>
+                {item.icon}
+                {badge !== null && (
+                  <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: '#fff', fontSize: '0.6rem', fontWeight: 700, minWidth: 14, height: 14, borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--surface)' }}>
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </span>
               {item.label}
             </Link>
           );
@@ -93,7 +114,7 @@ export default function Sidebar() {
 
       <div className="divider" style={{ margin: '0 0.75rem' }} />
 
-      {/* Bottom: Settings + User */}
+      {/* Bottom: Settings + Profile + User */}
       <div style={{ padding: '0.5rem 0.75rem' }}>
         <Link href={`${base}/settings`} className={`nav-item ${pathname.includes('/settings') ? 'active' : ''}`}>
           <span className="icon">
@@ -104,11 +125,20 @@ export default function Sidebar() {
           </span>
           Settings
         </Link>
+        <Link href="/profile" className={`nav-item ${pathname === '/profile' ? 'active' : ''}`}>
+          <span className="icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </span>
+          My Profile
+        </Link>
       </div>
+
 
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <div className="avatar avatar-sm">
+          <div className={`avatar avatar-sm ${user && isOnline(user.id) ? 'avatar-online' : ''}`}>
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.name} />
             ) : (

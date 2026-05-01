@@ -7,7 +7,7 @@ import { usePresenceStore } from '@/store/presence.store';
 export function useSocket(workspaceId?: string) {
   const addNotification = useNotificationStore((s) => s.addNotification);
   const { setOnlineUsers, addOnlineUser, removeOnlineUser } = usePresenceStore();
-  const prevWorkspaceId = useRef<string | undefined>();
+  const prevWorkspaceId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const socket = getSocket();

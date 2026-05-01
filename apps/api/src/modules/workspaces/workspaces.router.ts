@@ -5,16 +5,19 @@ import {
 } from './workspaces.controller';
 import { authMiddleware, workspaceGuard, adminGuard } from '../../middleware/auth.middleware';
 
-const router = Router();
+const router: Router = Router();
 
+// Public: invitation preview (no auth needed — user may not be logged in yet)
+router.get('/invitations/:token', getInvitation);
+
+// All routes below require authentication
 router.use(authMiddleware);
 
 // User's workspace list
 router.get('/', getMyWorkspaces);
 router.post('/', create);
 
-// Invitation (public token lookup, but requires auth to accept)
-router.get('/invitations/:token', getInvitation);
+// Accept invitation (requires auth — must be logged in to join)
 router.post('/invitations/accept', acceptInvite);
 
 // Workspace-scoped routes

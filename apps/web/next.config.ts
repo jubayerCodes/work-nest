@@ -1,17 +1,31 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
-  output: 'standalone', // Required for Railway deployment
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // 'standalone' is required for Railway/Docker but causes EPERM on Windows (symlink permission).
+  // Set NEXT_STANDALONE=true in the Railway build environment to enable it.
+  output: process.env.NEXT_STANDALONE === 'true' ? 'standalone' : undefined,
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
+        pathname: '//**',
       },
     ],
   },
-  // Allow importing from workspace packages
-  transpilePackages: ['@worknest/types', '@worknest/utils', '@worknest/validators'],
+  // Allow cross-origin requests from the API domain in production
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ctrl from './action-items.controller';
 import { authMiddleware, workspaceGuard } from '../../middleware/auth.middleware';
 
-const router = Router({ mergeParams: true });
+const router: Router = Router({ mergeParams: true });
 router.use(authMiddleware, workspaceGuard);
 
 router.get('/', ctrl.getItems);

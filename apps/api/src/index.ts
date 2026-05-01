@@ -23,7 +23,7 @@ import usersRouter from './modules/users/users.router';
 // Socket.io
 import { initSocket } from './realtime/socket';
 
-const app = express();
+const app: express.Application = express();
 const server = http.createServer(app);
 
 // ---- Security & Parsing Middleware ----
