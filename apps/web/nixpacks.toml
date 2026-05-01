@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm",
+  "cd /app && pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  "cd /app && NEXT_STANDALONE=true pnpm --filter @worknest/web build"
+]
+
+[start]
+cmd = "node /app/apps/web/.next/standalone/apps/web/server.js"

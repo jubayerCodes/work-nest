@@ -57,7 +57,7 @@ model User {
 
   memberships   WorkspaceMember[]
   ownedGoals    Goal[]
-  assignedItems ActionItem[]   @relation("Assignee")
+  assignedItems ActionItem[]      @relation("Assignee")
   notifications Notification[]
   reactions     Reaction[]
   comments      Comment[]
@@ -159,7 +159,7 @@ model Announcement {
   authorId    String
   workspaceId String
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   reactions Reaction[]
   comments  Comment[]
 }
@@ -219,9 +219,9 @@ model ActionItem {
   workspaceId String
   goalId      String?
 
-  assignee  User?      @relation("Assignee", fields: [assigneeId], references: [id])
-  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  goal      Goal?      @relation(fields: [goalId], references: [id])
+  assignee  User?     @relation("Assignee", fields: [assigneeId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal      Goal?     @relation(fields: [goalId], references: [id])
 }
 
 // ============================================================
@@ -260,9 +260,9 @@ model Notification {
 // ============================================================
 
 model UserPreference {
-  id             String  @id @default(cuid())
-  userId         String  @unique
-  actionItemView String  @default("kanban") // "kanban" | "list"
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  actionItemView  String  @default("kanban") // "kanban" | "list"
   lastWorkspaceId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
