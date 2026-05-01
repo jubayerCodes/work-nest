@@ -266,45 +266,90 @@ Clients join a workspace room by emitting `workspace:join`. Each user also autom
 
 ---
 
-## 🚢 Deployment (Railway)
+## 🚢 Deployment (Render)
 
-Both services are Railway-ready with `railway.json` configuration files.
+The project ships with a `render.yaml` Blueprint at the repo root — deploy everything in one click.
 
-### Step 1 — Create Services
+### One-Click Blueprint Deploy
 
-1. New project → **Add Service → GitHub Repo** (select `WorkNest`)
-2. Add **two services**: one for `apps/api`, one for `apps/web`
-3. Add a **PostgreSQL plugin** to the API service — `DATABASE_URL` is injected automatically
+1. Push your repo to GitHub
+2. Go to [render.com](https://render.com) → **New → Blueprint** → connect your repo
+3. Render auto-creates: **PostgreSQL** + **API service** + **Web service**
 
-### Step 2 — Set Environment Variables
+### Set Environment Variables (API service)
 
-**API service variables:**
 ```
-DATABASE_URL         → (auto-injected by Railway Postgres plugin)
-JWT_ACCESS_SECRET    → your secret
-JWT_REFRESH_SECRET   → your other secret
+DATABASE_URL         → auto-injected from Render PostgreSQL
+JWT_ACCESS_SECRET    → openssl rand -base64 64
+JWT_REFRESH_SECRET   → openssl rand -base64 64
 CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET
 RESEND_API_KEY
-EMAIL_FROM           → WorkNest <noreply@yourdomain.com>
-CLIENT_URL           → https://your-web-service.railway.app
+EMAIL_FROM           → WorkNest <onboarding@resend.dev>
+CLIENT_URL           → https://worknest-web.onrender.com
 NODE_ENV             → production
 PORT                 → 4000
 ```
 
-**Web service variables:**
+### Set Environment Variables (Web service)
+
 ```
-NEXT_PUBLIC_API_URL    → https://your-api-service.railway.app
-NEXT_PUBLIC_SOCKET_URL → https://your-api-service.railway.app
-JWT_ACCESS_SECRET      → same as API
+NEXT_PUBLIC_API_URL    → https://worknest-api.onrender.com
+NEXT_PUBLIC_SOCKET_URL → https://worknest-api.onrender.com
 ```
 
-### Step 3 — Deploy
+> **Free tier note:** Render free instances spin down after 15 min of inactivity — expect a ~30s cold start on first request. The Render PostgreSQL free tier expires after 90 days; use [Neon](https://neon.tech) or [Supabase](https://supabase.com) for a permanent free database.
 
-Railway will:
-- **API:** Run `npx prisma migrate deploy && node dist/index.js`
-- **Web:** Run `node server.js` (Next.js standalone output)
+Database migrations run automatically on every deploy via `npx prisma migrate deploy`. 🎉
 
-Database migrations run automatically on every deploy. 🎉
+---
+
+## ⭐ Advanced Features
+
+### 1. Real-time Kanban Board with Live Drag-and-Drop Sync
+
+The Action Items board uses **@dnd-kit** for smooth drag-and-drop across status columns (TODO → IN_PROGRESS → IN_REVIEW → DONE). What makes it advanced is the **optimistic + real-time sync layer**:
+
+- **Optimistic UI:** The card moves instantly in the UI before the API call completes, making the interaction feel instantaneous
+- **Socket.io broadcast:** When a card is dropped, the API persists the new status and emits an `action:moved` event to the entire workspace room
+- **Live sync for collaborators:** Any teammate viewing the same board sees the card animate to its new column in real time — no refresh needed
+- **Conflict resolution:** If the API call fails, the card snaps back to its original column with a toast error, keeping the UI consistent
+
+```
+User drags card → Optimistic move → API PATCH → Socket emit → All clients update
+                        ↓                                              ↑
+                  (instant feedback)                      (real-time broadcast)
+```
+
+### 2. @Mention System with In-App Notification Pipeline
+
+Comments on announcements support `@username` mentions with a full notification pipeline:
+
+- **Smart autocomplete:** Typing `@` opens a floating picker populated with workspace members — filtered as you type, keyboard-navigable
+- **Backend parsing:** The comment service extracts all `@name` patterns, resolves them to user IDs against the workspace members list, and deduplicates
+- **Transactional creation:** The comment and all mention notifications are written in a single Prisma transaction — either all succeed or none do
+- **Real-time delivery:** Each mentioned user's `user:<id>` Socket.io room receives a `notification:new` event immediately, incrementing their bell badge without a page refresh
+- **Persistence:** Notifications are stored in the DB so they survive page reloads and are available in the full notifications page
+
+```
+Comment submitted → @mention parsed → Notification records created (DB transaction)
+                                              ↓
+                              Socket.io → user:<id> room → Live bell badge
+```
+
+---
+
+## ⚠️ Known Limitations
+
+| Area | Limitation | Workaround / Future Fix |
+|------|------------|------------------------|
+| **Free-tier cold starts** | Render free instances sleep after 15 min inactivity; first request takes ~30s | Upgrade to Render Starter ($7/mo) or use a cron ping to keep alive |
+| **File upload size** | Avatar uploads capped at 10 MB (Multer limit) | Increase `limit` in `express.json` and Multer config |
+| **Socket.io scaling** | Socket.io uses in-memory state — does not scale horizontally across multiple API instances | Add Redis adapter (`@socket.io/redis-adapter`) for multi-instance support |
+| **Email deliverability** | Resend `onboarding@resend.dev` sender only delivers to the account owner's verified email in dev mode | Verify a custom domain on Resend for production invitations to any address |
+| **Announcement pinning** | Max 3 pinned announcements per workspace (enforced in service layer) | Configurable per-workspace limit is a planned feature |
+| **No pagination cursor** | List endpoints use offset pagination which degrades at large data sets | Replace with cursor-based pagination for Goals / Action Items |
+| **Presence accuracy** | Presence is tracked per-connection; browser tab close without clean disconnect may show user as online for up to 60s | Add a heartbeat timeout / TTL to presence records |
+| **No 2FA** | Authentication is username + password only | TOTP/2FA support is a planned feature |
 
 ---
 
@@ -396,12 +441,14 @@ worknest/
 ## 🔒 Security
 
 - Passwords hashed with **bcrypt** (cost factor 12)
-- JWTs stored in **httpOnly, Secure, SameSite=Strict cookies** — not localStorage
+- JWTs stored in **httpOnly, Secure, SameSite=None cookies** — not localStorage
+  - `SameSite=None` is required for cross-domain deployments (web + API on separate subdomains); `Secure=true` is enforced in production to mitigate the relaxed SameSite policy
 - **Rate limiting**: 20 req/15 min on auth routes, 300 req/15 min general (disabled in development)
 - **Helmet** sets security headers (CSP, X-Frame-Options, etc.)
-- **CORS** locked to `CLIENT_URL` env variable
+- **CORS** locked to `CLIENT_URL` env variable with `credentials: true`
 - Input validated with **Zod** on every API endpoint
 - Admin-only routes guarded by `adminGuard` middleware checking workspace role
+- **Refresh token rotation**: each token refresh issues a new refresh token and invalidates the old one (stored hashed in DB)
 
 ---
 
