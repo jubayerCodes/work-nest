@@ -16,7 +16,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default('WorkNest <noreply@worknest.io>'),
 
-  CLIENT_URL: z.string().url().default('http://localhost:3000'),
+  CLIENT_URL: z.string().url('CLIENT_URL must be set to the web app URL (e.g. https://worknest-web.onrender.com)'),
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
