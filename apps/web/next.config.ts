@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 'standalone' is required for Railway/Docker but causes EPERM on Windows (symlink permission).
-  // Set NEXT_STANDALONE=true in the Railway build environment to enable it.
+  // No 'standalone' needed — Vercel handles Next.js deployment natively.
+  // For self-hosted (Railway/Docker), set NEXT_STANDALONE=true to enable it.
   output: process.env.NEXT_STANDALONE === 'true' ? 'standalone' : undefined,
   images: {
     remotePatterns: [

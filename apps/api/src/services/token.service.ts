@@ -46,19 +46,19 @@ export function setCookies(
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 24 * 60 * 60 * 1000, // 1 day — matches JWT_ACCESS_EXPIRES_IN
   });
 
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/api/auth/refresh',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days — matches JWT_REFRESH_EXPIRES_IN
+    path: '/', // Send on all requests so interceptor can reach /api/auth/refresh
   });
 }
 
 export function clearCookies(res: import('express').Response): void {
   res.clearCookie('access_token');
-  res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+  res.clearCookie('refresh_token', { path: '/' }); // Must match the path set in setCookies
 }
