@@ -58,7 +58,7 @@ services:
     env: node
     region: oregon
     rootDir: apps/web
-    buildCommand: cd ../.. && npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && NEXT_STANDALONE=true pnpm --filter @worknest/web build
+    buildCommand: cd ../.. && npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && NEXT_STANDALONE=true pnpm --filter @worknest/web build && cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static && cp -r apps/web/public apps/web/.next/standalone/apps/web/public
     startCommand: HOSTNAME=0.0.0.0 node .next/standalone/apps/web/server.js
     healthCheckPath: /
     envVars:
