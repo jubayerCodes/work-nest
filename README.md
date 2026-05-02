@@ -20,6 +20,18 @@
 
 ---
 
+## 🎬 Video Overview
+
+<div align="center">
+
+[![WorkNest Demo Video](https://drive.google.com/thumbnail?id=1GeYFcGgNkwQbYkcrazH9q0c_wzc4J3OD&sz=w1280)](https://drive.google.com/file/d/1GeYFcGgNkwQbYkcrazH9q0c_wzc4J3OD/view?usp=drive_link)
+
+▶ **[Watch the full demo on Google Drive](https://drive.google.com/file/d/1GeYFcGgNkwQbYkcrazH9q0c_wzc4J3OD/view?usp=drive_link)**
+
+</div>
+
+---
+
 ## ✨ Features
 
 | Module | Highlights |
